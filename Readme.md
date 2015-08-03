@@ -1,49 +1,53 @@
-# bant
+# xtray
 
-create menubar apps on osx.
+create minimal tray apps on osx.
 
-(_work in progress_. bant on npm registry is something else, gonna replace it.)
+![screenshot](http://i.imgur.com/gVCZMN7.png)
 
 # example
 
 ```js
-var bant = require('bant'),
-    path = require('path');
+var xtray = require('xtray');
 
-var menu = bant();
-
-menu
-  .tooltip('example')
-  .icon(path.resolve(__dirname + '/icon.pdf'))
-  .addItem('print', function () {
-    console.log('bla');
-  })
-  .addSeparator()
-  .addItem("quit", function () {
-    menu.terminate();
-  })
-  .run();
+xtray({
+  name: 'Demo',
+  icon: __dirname + '/icon.pdf'
+}, function onlaunch () {
+  console.log('launched');
+  setInterval(function () {
+    console.log('loop is safe');
+  }, 1000);
+}, function onquit () {
+  console.log('will quit');
+});
 ```
 
 # api
 
 ```js
-var bant = require('bant')
+var xtray = require('xtray')
 ```
 
-## var menu = bant()
+## xtray(opts, [onlaunch, onquit])
 
-## menu.tooltip(text)
+Creates and launches the application.
 
-## menu.icon(filepath)
+`opts` object can have these properties:
 
-## menu.addItem(title, cb)
+- `icon` must be a pdf file, see [example/icon.pdf](example/icon.pdf) for an example
+- `name` is the tooltip, the text which appears when you hover over the icon, and it is also appended to "Quit" text
 
-## menu.addSeparator()
+You can provide the `onlaunch` callback that will be dispatched _after_ the application is finished launching. This doesn't block node.js i/o.
 
-## menu.run([cb])
+A `Quit [name]` menu item is added by default. There is no explicit terminate method; you can provide the `onquit` callback that will be dispatched _before_ the application quits.
 
-## menu.terminate([cb])
+# building
+
+This is indeed a super minimal demonstration of building a simple node.js ⇆  Swift bridge using objc runtime. Requires a Xcode build (>=6.3-beta) which is capable of compiling Swift 1.2.
+
+# packaging
+
+Now, I haven't yet tested packaging a Swift framework, but it seems Xcode makes sure linked dependencies are also copied into `build` folder. I have tweaked search paths, so it should be safe to pack up `node_modules` as it is- greatly appreciated if you can open an issue if something goes wrong.
 
 # license
 
