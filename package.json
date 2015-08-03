@@ -1,18 +1,19 @@
 {
-  "name": "bant",
+  "name": "xtray",
   "version": "0.1.0",
-  "description": "create menubar apps on osx",
+  "description": "create minimal tray apps on osx",
   "main": "index.js",
   "dependencies": {
     "nan": "^1.8.4"
   },
   "devDependencies": {},
   "scripts": {
-    "test": "tape test.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
     "install": "make clean all"
   },
   "keywords": [
     "menu",
+    "menubar",
     "tray",
     "osx",
     "cocoa",
@@ -25,10 +26,10 @@
   "gypfile": true,
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/tetsuo/bant.git"
+    "url": "git+https://github.com/tetsuo/xtray.git"
   },
   "bugs": {
-    "url": "https://github.com/tetsuo/bant/issues"
+    "url": "https://github.com/tetsuo/xtray/issues"
   },
-  "homepage": "https://github.com/tetsuo/bant#readme"
+  "homepage": "https://github.com/tetsuo/xtray#readme"
 }
