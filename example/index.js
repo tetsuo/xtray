@@ -1,23 +1,13 @@
-var bant = require('..'),
-    path = require('path');
+var xtray = require('..');
 
-setInterval(function () {
-  console.log('loop is ok');
-}, 1000);
-
-var app = bant();
-
-app
-  .tooltip('demo')
-  .icon(path.resolve(__dirname + '/icon.pdf'))
-  .addItem("Print things", function () {
-    console.log('printing things')
-  })
-  .addItem("Quit", function () {
-    app.terminate(function () {
-      console.log('app will terminate');
-    });
-  })
-  .run(function () {
-    console.log('app did launched');
-  });
+xtray({
+  name: 'Demo',
+  icon: __dirname + '/icon.pdf'
+}, function onlaunch () {
+  console.log('launched');
+  setInterval(function () {
+    console.log('loop is safe');
+  }, 1000);
+}, function onquit () {
+  console.log('will quit');
+});

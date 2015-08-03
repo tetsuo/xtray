@@ -6,97 +6,25 @@
 #include <sys/time.h>
 #include <dispatch/dispatch.h>
 #include <objc/message.h>
-#include <functional>
 #include <regex>
-#include <vector>
+#include <functional>
 
-using v8::Local;
-using v8::Value;
-using v8::Handle;
-using v8::Object;
-using v8::ObjectTemplate;
-using v8::Function;
-using v8::FunctionTemplate;
-
-typedef std::function<void()> callback_t;
+using namespace v8;
 
 static int embed_closed = 0;
+static bool uv_trip_timer_safety = false;
 static uv_sem_t embed_sem;
 static uv_thread_t embed_thread;
 
-static void WrapCallback (void *ctx) {
+static id nsapp;
+
+typedef std::function<void()> callback_t;
+
+static void wrap_callback (void* ctx) {
   auto& callback = *reinterpret_cast<callback_t*>(ctx);
   callback();
 }
 
-static const char* ToCString (const v8::String::Utf8Value& value) {
-  return *value ? *value : "<string conversion failed>";
-}
-
-class Bant : public node::ObjectWrap {
-public:
-  Bant();
-  
-  static void Init(v8::Handle<v8::Object> target);
-  static v8::Handle<v8::Value> NewInstance ();
-  
-  static NAN_METHOD(New);
-  static NAN_METHOD(SetToolTip);
-  static NAN_METHOD(SetIcon);
-  static NAN_METHOD(AddItem);
-  static NAN_METHOD(AddSeparator);
-  static NAN_METHOD(Run);
-  static NAN_METHOD(Terminate);
-
-private:
-  void DidFinishLaunching (NanCallback* cb);
-  void WillTerminate (NanCallback* cb);
-  void OnMenuItemClick (NanCallback* cb);
-  id facade;
-  std::vector<callback_t> cbs;
-};
-
-static v8::Persistent<v8::FunctionTemplate> bant_ctor;
-
-Class Facade(objc_getClass("app.Facade"));
-
-Bant::Bant() {
-  facade = objc_msgSend((id)Facade, sel_getUid("alloc"));
-  objc_msgSend(facade, sel_getUid("init"));
-}
-
-NAN_METHOD(CreateNew) {
-  NanScope();
-  NanReturnValue(Bant::NewInstance());
-}
-
-void Bant::Init(Handle<Object> target) {
-  Local<FunctionTemplate> tpl(NanNew<FunctionTemplate>(Bant::New));
-  
-  NanAssignPersistent(bant_ctor, tpl);
-  
-  tpl->SetClassName(NanNew<v8::String>("Bant"));
-  tpl->InstanceTemplate()->SetInternalFieldCount(1);
-  
-  NODE_SET_PROTOTYPE_METHOD(tpl, "tooltip", Bant::SetToolTip);
-  NODE_SET_PROTOTYPE_METHOD(tpl, "icon", Bant::SetIcon);
-  NODE_SET_PROTOTYPE_METHOD(tpl, "addItem", Bant::AddItem);
-  NODE_SET_PROTOTYPE_METHOD(tpl, "addSeparator", Bant::AddSeparator);
-  NODE_SET_PROTOTYPE_METHOD(tpl, "run", Bant::Run);
-  NODE_SET_PROTOTYPE_METHOD(tpl, "terminate", Bant::Terminate);
-
-  Local<Function> create =
-    NanNew<FunctionTemplate>(CreateNew)->GetFunction();
-  target->Set(NanNew<v8::String>("create"), create);
-}
-
-Handle<Value> Bant::NewInstance () {
-  Local<FunctionTemplate> handle(NanNew(bant_ctor));
-  Local<Object> inst(handle->GetFunction()->NewInstance(0, NULL));
-  return inst;
-}
-
-static bool uv_trip_timer_safety = false;
 static void uv_event (void* info) {
   int r, timeout, fd;
   struct kevent errors[1];
@@ -135,108 +63,64 @@ static void uv_event (void* info) {
   }
 }
 
-void Bant::DidFinishLaunching(NanCallback* cb) {
+static void handle_launch (NanCallback* cb) {
   embed_closed = 0;
-  
   uv_sem_init(&embed_sem, 0);
   uv_thread_create(&embed_thread, uv_event, NULL);
-  
   cb->Call(0, NULL);
 }
 
-void Bant::WillTerminate(NanCallback* cb) {
+static void handle_terminate (NanCallback* cb) {
   embed_closed = 1;
-  
   uv_loop_t* loop = uv_default_loop();
-  if (uv_loop_alive(loop))
+  if (uv_loop_alive(loop)) {
     uv_run(loop, UV_RUN_NOWAIT);
-  
+  }
   cb->Call(0, NULL);
 }
 
-void Bant::OnMenuItemClick(NanCallback* cb) {
-  cb->Call(0, NULL);
-}
-
-NAN_METHOD(Bant::Run) {
+NAN_METHOD(Run) {
   NanScope();
-  Bant* self(node::ObjectWrap::Unwrap<Bant>(args.This()));
   
-  NanCallback* cb = new NanCallback(args[0].As<Function>());
-  callback_t next = std::bind(&Bant::DidFinishLaunching, self, cb);
-  objc_msgSend(self->facade, sel_getUid("run:ctx:"), WrapCallback, &next);
+  Class Application(objc_getClass("app.Application"));
   
-  NanReturnUndefined();
-}
-
-NAN_METHOD(Bant::Terminate) {
-  NanScope();
-  Bant* self(node::ObjectWrap::Unwrap<Bant>(args.This()));
+  nsapp = objc_msgSend((id)Application, sel_getUid("alloc"));
+  objc_msgSend(nsapp, sel_getUid("init"));
   
-  NanCallback* cb = new NanCallback(args[0].As<Function>());
-  callback_t next = std::bind(&Bant::WillTerminate, self, cb);
-  objc_msgSend(self->facade, sel_getUid("terminate:ctx:"), WrapCallback, &next);
-  
-  NanReturnUndefined();
-}
-
-NAN_METHOD(Bant::SetToolTip) {
-  NanScope();
-  Bant* self(node::ObjectWrap::Unwrap<Bant>(args.This()));
-  
-  v8::String::Utf8Value str(args[0]);
-  const char* cstr = ToCString(str);
-  objc_msgSend(self->facade, sel_getUid("setToolTip:"), cstr);
-  
-  NanReturnValue(args.This());
-}
-
-NAN_METHOD(Bant::SetIcon) {
-  NanScope();
-  Bant* self(node::ObjectWrap::Unwrap<Bant>(args.This()));
-  
-  std::string str(*NanUtf8String(args[0]));
-  std::regex regex("^(.+)\\/(.+)\\.pdf$");
-  std::smatch result;
-  std::regex_search(str, result, regex);
-  
-  size_t len(result.size());
-  if (len > 2) {
-    std::string path = result.str(1);
-    std::string name = result.str(2);
-    objc_msgSend(self->facade, sel_getUid("setIcon:name:"),
-                 path.c_str(), name.c_str());
+  if (!args[0]->IsNull()) {
+    std::string tooltip(*NanUtf8String(args[0]));
+    objc_msgSend(nsapp, sel_getUid("setToolTip:"), tooltip.c_str());
   }
   
-  NanReturnValue(args.This());
-}
-
-NAN_METHOD(Bant::AddItem) {
-  NanScope();
-  Bant* self(node::ObjectWrap::Unwrap<Bant>(args.This()));
+  if (!args[1]->IsNull()) {
+    std::string icon(*NanUtf8String(args[1]));
+    std::regex regex("^(.+)\\/(.+)\\.pdf$");
+    std::smatch result;
+    std::regex_search(icon, result, regex);
+    
+    size_t len(result.size());
+    if (len > 2) {
+      std::string path = result.str(1);
+      std::string name = result.str(2);
+      objc_msgSend(nsapp, sel_getUid("setIcon:name:"), path.c_str(), name.c_str());
+    }
+  }
   
-  v8::String::Utf8Value str(args[0]);
-  const char* cstr = ToCString(str);
-  NanCallback* cb = new NanCallback(args[1].As<Function>());
-  self->cbs.push_back(std::bind(&Bant::OnMenuItemClick, self, cb));
-  objc_msgSend(self->facade, sel_getUid("addItem:cb:ctx:"), cstr, WrapCallback, &(self->cbs.back()));
+  NanCallback* onlaunch = new NanCallback(args[2].As<Function>());
+  callback_t onlaunch_fn = std::bind(&handle_launch, onlaunch);
+  objc_msgSend(nsapp, sel_getUid("setLaunchHandler:ctx:"), wrap_callback, &onlaunch_fn);
   
-  NanReturnValue(args.This());
-}
-
-NAN_METHOD(Bant::AddSeparator) {
-  NanScope();
-  Bant* self(node::ObjectWrap::Unwrap<Bant>(args.This()));
-  objc_msgSend(self->facade, sel_getUid("addSeparator"));
+  NanCallback* onquit = new NanCallback(args[3].As<Function>());
+  callback_t onquit_fn = std::bind(&handle_terminate, onquit);
+  objc_msgSend(nsapp, sel_getUid("setTerminateHandler:ctx:"), wrap_callback, &onquit_fn);
   
-  NanReturnValue(args.This());
+  objc_msgSend(nsapp, sel_getUid("run"));
+  
+  NanReturnUndefined();
 }
 
-NAN_METHOD(Bant::New) {
-  NanScope();
-  Bant *self = new Bant();
-  self->Wrap(args.This());
-  NanReturnValue(args.This());
+void Init(Handle<Object> exports, Handle<Object> module) {
+  module->Set(NanNew("exports"), NanNew<FunctionTemplate>(Run)->GetFunction());
 }
 
-NODE_MODULE(bant, Bant::Init);
+NODE_MODULE(addon, Init);

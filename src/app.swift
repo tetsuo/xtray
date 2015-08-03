@@ -25,26 +25,20 @@ func FromCString (ptr: COpaquePointer) -> String {
 
 class ApplicationDelegate: NSObject, NSApplicationDelegate {
   let statusItem = NSStatusBar.systemStatusBar().statusItemWithLength(-2)
-  let menu = NSMenu()
-  
-  func addMenuItem (title: String, representedObject: Callback) {
-    let item =
-      NSMenuItem(title: title, action: Selector("dispatchMenuItemCallback:"), keyEquivalent: "")
-    item.representedObject = representedObject
-    menu.addItem(item)
-  }
   
   func applicationDidFinishLaunching (notification: NSNotification) {
-    statusItem.highlightMode = true
+    let menu = NSMenu()
+    var title = "Quit"
+    if ((statusItem.toolTip) != nil) {
+      title += " " + statusItem.toolTip!
+    }
+    menu.addItem(NSMenuItem(title: title, action: Selector("terminate:"), keyEquivalent: ""))
     statusItem.menu = menu
-  }
-  
-  func dispatchMenuItemCallback (sender: AnyObject) {
-    (sender.representedObject as? Callback)!.call()
+    statusItem.highlightMode = true
   }
 }
 
-public class Facade: NSObject {
+public class Application: NSObject {
   let app = NSApplication.sharedApplication()
   let delegate = ApplicationDelegate()
   
@@ -64,37 +58,29 @@ public class Facade: NSObject {
     }
   }
   
-  public func addItem (title: COpaquePointer, cb: COpaquePointer, ctx: COpaquePointer) {
-    delegate.addMenuItem(FromCString(title), representedObject: Callback(cb: cb, ctx: ctx))
-  }
-  
-  public func addSeparator () {
-    delegate.menu.addItem(NSMenuItem.separatorItem());
-  }
-
-  public func run (cb: COpaquePointer, ctx: COpaquePointer) {
-    NSNotificationCenter.defaultCenter()
-      .addObserver(self,
-        selector: Selector("didFinishLaunching:"),
-        name: NSApplicationDidFinishLaunchingNotification,
-        object: nil)
-    
-    launchHandler = Callback(cb: cb, ctx: ctx)
-    app.setActivationPolicy(NSApplicationActivationPolicy.Accessory)
-    app.activateIgnoringOtherApps(true)
-    app.delegate = delegate
-    app.run()
-  }
-  
-  public func terminate (cb: COpaquePointer, ctx: COpaquePointer) {
+  public func setTerminateHandler (cb: COpaquePointer, ctx: COpaquePointer) {
     NSNotificationCenter.defaultCenter()
       .addObserver(self,
         selector: Selector("willTerminate:"),
         name: NSApplicationWillTerminateNotification,
         object: nil)
-    
     terminateHandler = Callback(cb: cb, ctx: ctx)
-    app.terminate(0)
+  }
+  
+  public func setLaunchHandler (cb: COpaquePointer, ctx: COpaquePointer) {
+    NSNotificationCenter.defaultCenter()
+      .addObserver(self,
+        selector: Selector("didFinishLaunching:"),
+        name: NSApplicationDidFinishLaunchingNotification,
+        object: nil)
+    launchHandler = Callback(cb: cb, ctx: ctx)
+  }
+
+  public func run () {
+    app.setActivationPolicy(NSApplicationActivationPolicy.Accessory)
+    app.activateIgnoringOtherApps(true)
+    app.delegate = delegate
+    app.run()
   }
   
   func willTerminate (notification: NSNotification) {
