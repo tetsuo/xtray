@@ -4,6 +4,8 @@ create minimal tray apps on osx.
 
 ![screenshot](http://i.imgur.com/gVCZMN7.png)
 
+**Note: Swift 1.2 is no longer supported, so this module doesn't compile anymore. You can port the Swift part to Obj-C or look into the new Swift syntax if you really need to get this working.**
+
 # example
 
 ```js
