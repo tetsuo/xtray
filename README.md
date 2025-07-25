@@ -52,12 +52,12 @@ Launches the macOS menubar app and blocks until it is quit.
 
 ### Options
 
-| Option             | Description                                 |
-| ------------------ | ------------------------------------------- |
-| `Tooltip(string)`  | Sets the tooltip shown on hover             |
-| `Icon(string)`     | Path to a `.pdf` tray icon                  |
-| `OnLaunch(func())` | Called after the app has finished launching |
-| `OnQuit(func())`   | Called before the app terminates            |
+| Option                       | Description                                 |
+| ---------------------------- | ------------------------------------------- |
+| `WithTooltip(string)`        | Sets the tooltip shown on hover             |
+| `WithIcon(string)`           | Path to a `.pdf` tray icon                  |
+| `WithLaunchCallback(func())` | Called after the app has finished launching |
+| `WithQuitCallback(func())`   | Called before the app terminates            |
 
 ## License
 
