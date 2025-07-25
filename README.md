@@ -1,6 +1,6 @@
-# xtray
+# xtray 🧃
 
-🧃 Tiny macOS menubar utility for Go.
+Tiny macOS menubar utility for Go.
 
 ![screenshot](http://i.imgur.com/gVCZMN7.png)
 
